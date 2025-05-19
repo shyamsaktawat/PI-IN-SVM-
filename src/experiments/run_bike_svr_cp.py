@@ -4,27 +4,25 @@ import time
 from sklearn.model_selection import train_test_split
 
 # Dynamically load lp_svr12 module
-# import importlib.util # Removed
-# spec = importlib.util.spec_from_file_location("lp_svr12", "lp_svr12.py") # Removed
-# lp = importlib.util.module_from_spec(spec) # Removed
-# spec.loader.exec_module(lp) # Removed
-from src.models import base_svr as lp # Added
+import importlib.util
+spec = importlib.util.spec_from_file_location("lp_svr12", "lp_svr12.py")
+lp = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(lp)
 # Disable verbose printing in lp_svr12
 lp.verbose = False
 quantileSVR = lp.quantileLPONENORMTSVR12
 evaluate_PICP_MPIW = lp.evaluate_PICP
 
 # Import feature selection function from MADELON
-# spec_fs = importlib.util.spec_from_file_location("fs", "MADELON/feature_selection.py") # Removed
-# fs_module = importlib.util.module_from_spec(spec_fs) # Renamed fs to fs_module to avoid conflict with alias
-# spec_fs.loader.exec_module(fs_module) # Removed
-from src.feature_selection import selectors as fs # Added - fs is now the alias for the selectors module
-linearTSVR = fs.linear_quantile_lponenorm_tsvr # Assuming this function is in selectors.py
+spec_fs = importlib.util.spec_from_file_location("fs", "MADELON/feature_selection.py")
+fs = importlib.util.module_from_spec(spec_fs)
+spec_fs.loader.exec_module(fs)
+linearTSVR = fs.linear_quantile_lponenorm_tsvr
 
 # -------------------------------
 # 1. Load and preprocess bike data
 # -------------------------------
-df = pd.read_csv("../../datasets_new/bike_train.csv")
+df = pd.read_csv("../datasets/bike_train.csv")
 print(f"[1] Loaded bike data: {df.shape[0]} samples, {df.shape[1]-1} features (excluding target)")
 # Season and weather dummies
 df = pd.concat([df, pd.get_dummies(df['season'], prefix='season')], axis=1)

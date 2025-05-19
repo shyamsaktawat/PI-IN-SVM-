@@ -58,8 +58,8 @@ def main():
     # %% Step 1: Load the Madelon training dataset and labels
     # The files are assumed to be in the "MADELON" folder.
     # madelon_train.data contains the feature data and madelon_train.labels holds the labels.
-    train_data = pd.read_csv("../../datasets_new/MADELON/madelon_train.data", header=None, delim_whitespace=True)
-    train_labels = pd.read_csv("../../datasets_new/MADELON/madelon_train.labels", header=None, delim_whitespace=True)
+    train_data = pd.read_csv("../datasets/MADELON/madelon_train.data", header=None, delim_whitespace=True)
+    train_labels = pd.read_csv("../datasets/MADELON/madelon_train.labels", header=None, delim_whitespace=True)
     
     # Convert data to numeric (if not already) and impute missing values if any
     train_data = train_data.apply(pd.to_numeric, errors='coerce')
