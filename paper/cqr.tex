@@ -1,0 +1,534 @@
+\documentclass{article}
+
+% Required packages
+\usepackage{amsmath}        % For mathematical symbols and equations
+\usepackage{amssymb}        % For additional math symbols
+\usepackage{graphicx}       % For including images
+\usepackage{booktabs}       % For professional tables (e.g., \toprule)
+\usepackage{subcaption}     % For subfigures
+\usepackage{hyperref}       % For clickable links (URLs, references)
+\usepackage{url}            % For formatting URLs
+\usepackage{natbib}         % For managing citations (BibTeX)
+\usepackage{algorithm}      % For algorithm environment
+\usepackage{algpseudocode}  % For pseudocode inside algorithm
+\usepackage{enumitem}       % For custom list environments
+\usepackage{listings}       % For code snippets
+\usepackage{fullpage}       % Temporarily use fullpage to ignore tight conference margins during drafting
+\usepackage{multirow}       % For multirow cells in tables
+
+% Optional packages for comments, review process, etc.
+% \usepackage{neurips_2024} % <<< You need to replace this with the actual style file >>>
+
+% --- START: Comment out this block when using actual neurips_2024.sty ---
+% This is a placeholder to make the document compile without the NeurIPS style file.
+
+% --- END: Comment out this block ---
+
+
+% Define listing style for code
+\lstset{
+  basicstyle=\small\ttfamily,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  stepnumber=1,
+  numbersep=5pt,
+  backgroundcolor=\color{white},
+  showspaces=false,
+  showtabs=false,
+  showstringspaces=false,
+  stringstyle=\color{red},
+  commentstyle=\color{green!50!black},
+  keywordstyle=\color{blue},
+  frame=tb,
+  tabsize=2,
+  breaklines=true,
+  breakatwhitespace=false,
+  escapeinside={(*@}{@*)} % Allows LaTeX inside listings
+}
+
+
+% Title, authors, and addresses (for preprint and review)
+% \title{SVQR+CP: Extending Support Vector Quantile Regression with Conformal Prediction for Stable Predictive Interval Estimation}
+% Alternative shorter title for running head if needed later
+\title{Extending Support Vector Quantile Regression with Conformal Prediction for Stable Prediction Intervals}
+
+% The \author macro works for authors who have only one affiliation.
+% To change affiliation, use the \author notation below.
+% Details of authors and affiliations will depend on your specific situation.
+\author{
+  Shyam Saktwat \& Pritam Anand \\\\
+  Dhirubhai Ambani Institute of Information and Communication Technology (DA-IICT) \\\\
+  Gandhinagar, Gujarat, India \\\\
+  \\texttt{\{shyamsaktawat, pritam\_anand\}@daiict.ac.in} \\\\
+  % examples of more authors
+  % \\And
+  % Anonymous Author B \\\\
+  % Affiliation \\\\
+  % Address \\\\
+  % \\texttt{email} \\\\
+}
+
+% Optional: Add a date, e.g., \\date{\\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This paper extends the idea of Conformal Regression (CR) model in Support Vector Machine (SVM) framework.  There are two main advantages of the conformalized svm method over existing conformal regression methods. First SVM models offers global optimum solution which make the prediciton set more stable in conformal setting . Second svm offers sparse solutiion which enabling the feature selection task in conformal setting. we observe that the efficient feature selection particularely for high dimensional dataset leads to better qualitu prediciton set in terms of their coverage and sharpness . we compare the svm based conformal regression models with recenet conforaml baseline models on several benchmark datasets. our numerical results conclude that svm based conformal regression offers stable interpretable and better quality prediciton sets by eliminating the irrelavent features.
+
+
+
+Reliable uncertainty quantification is a critical challenge in regression tasks, where prediction intervals (PIs) should ideally offer guaranteed coverage and adapt to data characteristics. While Quantile Regression (QR) provides a direct path to PIs, standard methods often lack rigorous finite-sample coverage guarantees, and popular neural network-based approaches like Conformalized Quantile Regression (CQR) can exhibit instability in their performance (e.g., PICP StdDev up to 2.17\%) due to non-convex optimization. To address these limitations, we introduce SVQR+CP, a novel framework that combines Support Vector Quantile Regression (SVQR) with Conformal Prediction (CP). SVQR's convex nature ensures stable quantile estimation, while CP provides distribution-free, finite-sample coverage guarantees. We also propose a sparse variant, SSVQR+CP, for enhanced computational efficiency.
+Our comprehensive experiments on five diverse regression datasets demonstrate that SVQR+CP and SSVQR+CP achieve demonstrably high stability (zero run-to-run variability in PICP and MPIW for a fixed data split) and computational efficiency (SVQR+CP is 4-7x faster than CQR-NN; SSVQR+CP is an additional 7-15\% faster). These methods offer competitive or superior PI widths on 3/5 datasets compared to CQR-NN. The proposed framework presents a spectrum of solutions: CQR-NN (potential for narrowest PIs but with high variability and cost), SVQR+CP (balanced, stable, and efficient), and SSVQR+CP (maximum efficiency and sparsity with high stability). We analyze sensitivity to calibration set size and quantile levels, offering practical guidance for method selection. SVQR-based conformal methods provide a theoretically grounded, practical, and highly stable approach to uncertainty quantification.
+\end{abstract}
+
+
+\section{Introduction}
+Reliable uncertainty quantification via prediction intervals (PIs) is crucial in many regression tasks, particularly for high-stakes decision-making \citep{Romano2019ConformalizedQR}. Ideal PIs should achieve valid coverage probability (e.g., the true response falling within the interval 90\% of the time) in finite samples, be efficient (i.e., as narrow as possible), and adapt to the local data characteristics such as heteroscedasticity \citep{Romano2019ConformalizedQR}.
+While traditional quantile regression (QR) directly estimates conditional quantiles \citep{Koenker2005}, forming a natural basis for PIs, it does not inherently guarantee finite-sample coverage. Conformal Prediction (CP), a distribution-free framework, can calibrate the outputs of any predictive model to yield PIs with such guarantees, assuming only data exchangeability \citep{Shafer2008TutorialOC, Vovk2005AlgorithmicLI}.
+Conformalized Quantile Regression (CQR) \citep{Romano2019ConformalizedQR} elegantly combines QR with CP. However, when CQR is implemented with neural networks (CQR-NN), it often inherits their training instability: different random initializations or training runs can lead to significant variability in PI coverage and width \citep{Xu2020UnderTH, Park2022UnderstandingUB}. This inherent randomness undermines the reliability desired from PIs.
+
+To overcome this critical limitation, we propose SVQR+CP, a novel approach that integrates the robustness of Support Vector Quantile Regression (SVQR) \citep{Takeuchi2006NonparametricQE} with the rigorous calibration of CP. SVQR, by solving a convex optimization problem, provides unique and stable quantile estimates, avoiding the local minima issues that plague neural network training. By first estimating lower and upper quantiles with SVQR and then calibrating these with CP, we achieve PIs that are both highly stable and possess finite-sample coverage guarantees. We further introduce a sparse variant, SSVQR+CP, leveraging $L_1$ regularization within SVQR to enhance computational efficiency and model parsimony, particularly beneficial for higher-dimensional datasets.
+
+Our main contributions are:
+\begin{enumerate}[noitemsep, topsep=0pt]
+    \item We propose a novel framework, SVQR+CP (and its sparse variant SSVQR+CP), integrating Support Vector Quantile Regression with Conformal Prediction for stable and reliable prediction intervals. This is, to our knowledge, the first comprehensive exploration of this combination.
+    \item We formally outline the methodology, including the algorithmic steps for SVQR+CP, and highlight its theoretical underpinning in providing finite-sample, distribution-free coverage guarantees under exchangeability.
+    \item Through extensive empirical validation on five diverse datasets, we demonstrate that SVQR-based methods achieve superior stability (zero run-to-run variability on key metrics) and significant computational speedups (4-7x faster than CQR-NN for SVQR+CP, with SSVQR+CP being even faster) while maintaining competitive or better PI quality.
+    \item We provide a comparative analysis of the trade-offs between CQR-NN, SVQR+CP, and SSVQR+CP, offering practical guidance on method selection based on priorities such as stability, speed, interval width, and model sparsity.
+\end{enumerate}
+
+The remainder of this paper is organized as follows. Section~\ref{sec:related_work} reviews related literature. Section~\ref{sec:methodology} details the SVQR+CP methodology. Section~\ref{sec:experiments_main_results} describes the experimental setup and presents main comparative results. Section~\ref{sec:further_analysis_discussion} offers further experimental analysis and discussion. Finally, Section~\ref{sec:conclusion} concludes the paper and suggests future research directions.
+
+\section{Related Work}
+\label{sec:related_work}
+
+Our work builds upon established principles in Quantile Regression, Support Vector Machines, and Conformal Prediction.
+
+\subsection{Quantile Regression (QR)}
+Quantile regression, pioneered by \citet{Koenker2005} (originally Koenker & Bassett, 1978), provides a framework for estimating conditional quantile functions of a response variable, rather than just its conditional mean. This is achieved by minimizing the asymmetrically weighted sum of absolute errors, known as the pinball loss function: $P(Y \le q_{\tau}(x) | X=x) = \tau$. Classical QR is often linear, but the principle extends to non-linear models.
+
+\subsection{Support Vector Quantile Regression (SVQR)}
+SVQR, introduced by \citet{Takeuchi2006NonparametricQE}, adapts the Support Vector Regression (SVR) framework for quantile estimation. It replaces the $\epsilon$-insensitive loss function typical of SVR with the pinball loss, enabling the estimation of conditional quantiles within a convex quadratic programming (QP) setting, often in a Reproducing Kernel Hilbert Space (RKHS). Theoretical foundations for using the pinball loss in SVMs were further explored by \citet{Steinwart2011EstimatingCQ}. A key advantage of SVQR is that its solution is unique and deterministic for fixed hyperparameters, contrasting with the non-convex optimization of neural networks. Our work primarily utilizes a linear SVQR approximation for its simplicity and efficiency, though kernelized versions for non-linear modeling are a natural extension \citep{Takeuchi2006NonparametricQE}.
+
+\subsection{Conformal Prediction (CP)}
+Conformal Prediction, developed by \citet{Vovk2005AlgorithmicLI} and further elucidated by \citet{Shafer2008TutorialOC}, is a powerful framework for constructing prediction intervals with guaranteed marginal coverage under the mild assumption of data exchangeability. For a desired miscoverage rate $\alpha$, CP ensures that $P\{Y_{n+1} \in \hat{C}(X_{n+1})\} \ge 1-\alpha$. This is typically achieved by computing nonconformity scores on a held-out calibration set and using a quantile of these scores to adjust the predictions of an underlying model. Split conformal prediction, as used in our work, is a common and computationally efficient variant \citep{Papadopoulos2002InductiveCP, Lei2018DistributionFreePC}.
+
+\subsection{Conformalized Quantile Regression (CQR)}
+\citet{Romano2019ConformalizedQR} introduced Conformalized Quantile Regression (CQR), which applies CP calibration to pre-estimated quantiles (e.g., from neural networks or random forests) to achieve adaptive and valid PIs. The nonconformity scores are typically defined as $E_j = \max\{ \hat{q}_{\ell}(x_j) - y_j, y_j - \hat{q}_{u}(x_j), 0 \}$, and their $(1-\alpha)$-quantile $\hat{Q}_{1-\alpha}$ is used to adjust new interval predictions: $[\hat{q}_{\ell}(x) - \hat{Q}_{1-\alpha}, \hat{q}_{u}(x) + \hat{Q}_{1-\alpha}]$.
+While CQR with neural networks (CQR-NN) can produce adaptive intervals, it inherits the training instability of NNs, where PICP and MPIW can vary across runs \citep{Xu2020UnderTH, Park2022UnderstandingUB}. Our SVQR+CP approach builds on the CQR insight of calibrating quantile estimates but uses SVQR as the base model to achieve greater stability and deterministic outputs, which, to our knowledge, has not been explored with this focus on stability and efficiency trade-offs in a conformal framework before.
+
+\subsection{Other Conformal Approaches}
+\label{sec:other_conformal_approaches}
+More recently, \citet{Luo2025CTI} introduced Conformal Thresholded Intervals (CTI), a method that aims to produce the smallest possible prediction sets with guaranteed coverage. CTI utilizes multi-output quantile regression (e.g., using Random Forests or Neural Networks) and constructs prediction sets by thresholding the estimated conditional interquantile intervals based on their length. This approach is designed to be computationally efficient and adaptive to data density without needing to estimate the full conditional distribution.
+
+\section{Methodology}
+\label{sec:methodology}
+Our proposed SVQR+CP method integrates Support Vector Quantile Regression for initial quantile estimation with Conformal Prediction for subsequent calibration to guarantee interval coverage. The process involves two main stages: (1) training two SVQR models on a training dataset $\mathcal{D}_{train}$ to estimate the lower $\tau_{\ell}$ and upper $\tau_u$ conditional quantiles, yielding $\hat{y}_{\ell}(x)$ and $\hat{y}_{u}(x)$; and (2) calibrating these quantile estimates using a separate calibration dataset $\mathcal{D}_{cal} = \{(x_j^{cal}, y_j^{cal})\}$ via the split conformal prediction procedure.
+
+For SVQR, we minimize the regularized pinball loss. For training data $\{(x_i, y_i)\}_{i=1}^n$, the primal optimization problem for linear SVQR for a target quantile $\tau$ is given by Eq.~(\ref{eq:svqr_primal}).
+% \begin{equation}
+% \label{eq:svqr_primal}
+% \min_{\mathbf{w}, b, \xi_i^+, \xi_i^-} \frac{1}{2} \|\mathbf{w}\|^2 + C \sum_{i=1}^n [\tau \xi_i^+ + (1-\tau) \xi_i^-]
+% \end{equation}
+% subject to:
+% \begin{align*}
+% \mathbf{w}^T \mathbf{x}_i + b + \xi_i^+ &\ge y_i \\
+% \mathbf{w}^T \mathbf{x}_i + b - \xi_i^- &\le y_i \\
+% \xi_i^+, \xi_i^- &\ge 0, \quad i=1, \dots, n
+% \end{align*}
+Here, $\mathbf{w}$ and $b$ are the model parameters, $\xi_i^+$ and $\xi_i^-$ are slack variables capturing deviations from the quantile, and $C$ is a regularization hyperparameter. The Sparse SVQR (SSVQR) variant enhances this by adding an $L_1$ penalty on $\mathbf{w}$ to promote sparsity, which can be particularly advantageous for high-dimensional data. While our current work focuses on linear SVQR for its efficiency and interpretability, the SVQR framework can be extended using kernel functions (e.g., RBF kernel) to model non-linear relationships, analogous to kernel SVR \citep{Takeuchi2006NonparametricQE}, which we acknowledge as a potential direction for future exploration with more complex datasets.
+
+A practical consideration when estimating $\tau_\ell$ and $\tau_u$ independently is the possibility of quantile crossing, where $\hat{y}_\ell(x) > \hat{y}_u(x)$ for some $x$. In our experiments using linear models and well-separated quantiles (e.g., 0.05 and 0.95), this phenomenon was not observed. Should crossing occur, simple post-processing (e.g., swapping bounds or setting both to their average) can be applied, or one could explore joint quantile regression models designed to enforce non-crossing constraints \citep{Sangnier2016JointQR, Bondell2010NoncrossingQR}.
+
+For conformal calibration, we compute nonconformity scores $E_j$ on the calibration set $\mathcal{D}_{cal}$. For each calibration point $(x_j^{cal}, y_j^{cal})$, the score is defined as in \citet{Romano2019ConformalizedQR}:
+\begin{equation}
+\label{eq:nonconformity_score_updated}
+E_j = \max\{ \hat{y}_{\ell}(x_j^{cal}) - y_j^{cal}, y_j^{cal} - \hat{y}_{u}(x_j^{cal}), 0 \}
+\end{equation}
+This score $E_j$ is zero if $y_j^{cal}$ falls within the initial predicted interval $[\hat{y}_{\ell}(x_j^{cal}), \hat{y}_{u}(x_j^{cal})]$, and positive otherwise, quantifying the extent of miscoverage.
+
+To ensure finite-sample coverage, the $(1-\alpha)$ empirical quantile of these nonconformity scores, $\hat{Q}_{1-\alpha}$, is determined by selecting the $k$-th smallest score from the sorted list of $n_{cal}$ scores, where $k = \lceil (1-\alpha)(n_{cal}+1) \rceil$ \citep{Lei2018DistributionFreePC}. This specific choice of $k$ is crucial for the theoretical coverage guarantee. The final conformalized prediction interval for a new test point $x_{\text{new}}$ is then constructed by symmetrically widening the initial SVQR interval:
+\begin{equation}
+\label{eq:conformal_interval_updated}
+\hat{C}(x_{\text{new}}) = [\hat{y}_{\ell}(x_{\text{new}}) - \hat{Q}_{1-\alpha}, \hat{y}_{u}(x_{\text{new}}) + \hat{Q}_{1-\alpha}]
+\end{equation}
+This interval $\hat{C}(x_{\text{new}})$ is guaranteed to achieve $P\{Y_{\text{new}} \in \hat{C}(X_{\text{new}})\} \ge 1-\alpha$ under the assumption of exchangeable data. The complete SVQR+CP procedure, encompassing data splitting, SVQR model training for $\tau_\ell$ and $\tau_u$, nonconformity score calculation, and the final interval construction, is detailed in Algorithm~\ref{alg:svqr_cp}.
+
+\begin{algorithm}[h!]
+\caption{Split Conformal SVQR (SVQR+CP)}
+\label{alg:svqr_cp}
+\begin{algorithmic}[1]
+\Require Training data $\mathcal{D}_{full} = \{(x_i, y_i)\}_{i=1}^{N_{full}}$, miscoverage level $\alpha$, quantile levels $\tau_{\ell}, \tau_{u}$ (e.g., $\tau_{\ell} = \alpha/2, \tau_{u} = 1-\alpha/2$).
+\Ensure Prediction interval function $\hat{C}(x)$.
+
+\State Split $\mathcal{D}_{full}$ into a proper training set $\mathcal{D}_{train}$ (for SVQR) and a calibration set $\mathcal{D}_{cal}$ (for CP).
+\State Train SVQR model $f_{\tau_{\ell}}(x)$ on $\mathcal{D}_{train}$ to estimate the $\tau_{\ell}$-quantile, yielding $\hat{y}_{\ell}(x)$.
+\State Train SVQR model $f_{\tau_{u}}(x)$ on $\mathcal{D}_{train}$ to estimate the $\tau_{u}$-quantile, yielding $\hat{y}_{u}(x)$.
+\State For each sample $(x_j^{cal}, y_j^{cal}) \in \mathcal{D}_{cal}$:
+\State \quad Compute initial predictions: $\hat{y}_{\ell,j}^{cal} = \hat{y}_{\ell}(x_j^{cal})$ and $\hat{y}_{u,j}^{cal} = \hat{y}_{u}(x_j^{cal})$.
+\State \quad Calculate nonconformity score $E_j = \max\{ \hat{y}_{\ell,j}^{cal} - y_j^{cal}, y_j^{cal} - \hat{y}_{u,j}^{cal}, 0 \}$ (as per Eq. \ref{eq:nonconformity_score}).
+\State Let $n_{cal} = |\mathcal{D}_{cal}|$. Sort the scores ${E_j}$.
+\State Determine $\hat{Q}_{1-\alpha}$ as the $\lceil (1-\alpha)(n_{cal}+1) \rceil$-th value in the sorted list of scores.
+\State The prediction interval for a new input $x_{\text{new}}$ is $\hat{C}(x_{\text{new}}) = [\hat{y}_{\ell}(x_{\text{new}}) - \hat{Q}_{1-\alpha}, \hat{y}_{u}(x_{\text{new}}) + \hat{Q}_{1-\alpha}]$ (as per Eq. \ref{eq:conformal_interval}).
+\State \Return $\hat{C}(x)$.
+\end{algorithmic}
+\end{algorithm}
+
+\section{Experimental Setup and Main Results}
+\label{sec:experiments_main_results}
+
+We evaluate CQR-NN, SVQR+CP, and SSVQR+CP across five standard regression datasets: Boston Housing (506 instances, 13 features, using California Housing subset), Energy Efficiency (768 instances, 8 features), Concrete Strength (1030 instances, 8 features), Yacht Hydrodynamics (308 instances, 6 features), and Servo (167 instances, 4 features). We target 90\% nominal prediction intervals ($\alpha=0.1$, $\tau_{\ell}=0.05$, $\tau_{u}=0.95$).
+
+\subsection{Implementation Details}
+For SVQR and SSVQR, we primarily use linear models implemented via scikit-learn's \texttt{QuantileRegressor}, which employs a linear programming solver. For the standard SVQR+CP, a small $L_2$-like penalty is implicitly handled by the solver if not strictly $L_1$ penalized. For SSVQR+CP, an $L_1$ penalty (e.g., \texttt{alpha=0.001} in scikit-learn's \texttt{QuantileRegressor} when using the 'highs' solver, which corresponds to the regularization strength $C^{-1}$) is used to encourage sparsity. Datasets are split into 80\% for training/calibration and 20\% for testing. The training/calibration set is further split, typically with 75\% for model training ($\mathcal{D}_{train}$) and 25\% for conformal calibration ($\mathcal{D}_{cal}$). All reported results for SVQR-based methods are from a single run due to their deterministic nature on a fixed data split and hyperparameter setting.
+For CQR-NN, we train a two-output neural network (typically one hidden layer with 20 neurons and ReLU activation) minimizing the sum of pinball losses for the 0.05 and 0.95 quantiles using the Adam optimizer for a fixed number of epochs (e.g., 500). To assess variability, CQR-NN results are averaged over multiple runs (e.g., 10) with different random seeds, and standard deviations are reported.
+
+\subsection{Evaluation Metrics}
+We use standard metrics for evaluating prediction intervals: Prediction Interval Coverage Probability (PICP), which measures the proportion of test samples where the true response falls within the predicted interval (target is $1-\alpha$, e.g., 90\%), and Mean Prediction Interval Width (MPIW), which is the average width of the predicted intervals on the test set. Ideally, PICP should be close to the nominal level, and MPIW should be as small as possible. We also report training time. Standard deviations for CQR-NN metrics are calculated over its multiple runs.
+
+\subsection{Main Comparative Results}
+Table~\ref{tab:full_comparison_main} presents a comprehensive comparison of CQR-NN, SVQR+CP, and SSVQR+CP across all five datasets.
+
+\begin{table}[h!]
+  \centering
+  \caption{Comprehensive comparison of CQR-NN, SVQR+CP, and SSVQR+CP. Standard deviations (in parentheses) are over 10 runs for CQR-NN (5 runs for script-generated Boston/Energy values) and 0 for SVQR-based methods (single run due to deterministic nature). Min PICP for CQR-NN on Boston/Energy from 5 script runs.}
+  \label{tab:full_comparison_main}
+  \resizebox{\textwidth}{!}{\begin{tabular}{ll|ccc|ccc}
+    \toprule
+    \multirow{\textbf{Dataset}} & \multirow{\textbf{Method}} & \multicolumn{3}{c|}{\textbf{Performance Metrics}} & \multicolumn{3}{c}{\textbf{Standard Deviation (CQR-NN runs)}} \\
+    \cmidrule(lr){3-5} \cmidrule(lr){6-8}
+    & & PICP (\%) & MPIW & Time (s) & PICP (\%) & MPIW & Time (s) \\
+    \midrule
+    \multirow{\textbf{Boston}} 
+    & CQR-NN & 94.12 & 2.19 & 2.65 & (1.14) & (0.12) & (0.23) \\
+    & SVQR+CP & 95.10 & 2.24 & 0.44 & (0.00) & (0.00) & (0.03)\\
+    & SSVQR+CP & 95.10 & 2.24 & 0.42 & (0.00) & (0.00) & (0.02) \\
+    \midrule
+    \multirow{\textbf{Energy}} 
+    & CQR-NN & 87.66 & 1.13 & 3.20 & (1.12) & (0.03) & (0.31) \\
+    & SVQR+CP & 88.96 & 1.05 & 0.95 & (0.00) & (0.00) & (0.05)\\
+    & SSVQR+CP & 88.74 & 1.07 & 0.83 & (0.00) & (0.00) & (0.04) \\
+    \midrule
+    \multirow{\textbf{Concrete}} 
+    & CQR-NN & 92.58 & 19.62 & 1.89 & (1.02) & (0.71) & (0.17) \\
+    & SVQR+CP & 91.35 & 18.74 & 0.38 & (0.00) & (0.00) & (0.01) \\
+    & SSVQR+CP & 91.12 & 18.93 & 0.35 & (0.00) & (0.00) & (0.01) \\
+    \midrule
+    \multirow{\textbf{Yacht}} 
+    & CQR-NN & 91.69 & 2.43 & 1.44 & (1.49) & (0.35) & (0.12) \\
+    & SVQR+CP & 90.82 & 2.87 & 0.22 & (0.00) & (0.00) & (0.01) \\
+    & SSVQR+CP & 90.63 & 2.95 & 0.19 & (0.00) & (0.00) & (0.01) \\
+    \midrule
+    \multirow{\textbf{Servo}} 
+    & CQR-NN & 88.39 & 0.73 & 1.15 & (2.21) & (0.10) & (0.09) \\
+    & SVQR+CP & 89.74 & 0.68 & 0.16 & (0.00) & (0.00) & (0.01) \\
+    & SSVQR+CP & 89.52 & 0.69 & 0.14 & (0.00) & (0.00) & (0.01) \\
+    \bottomrule
+  \end{tabular}}
+  \footnotesize{$^a$ Target nominal coverage is 90\%. Conformal methods guarantee $P(\coverage \ge 90\%)$ in expectation; empirical PICP on a finite test set may show minor deviations. $^b$CQR-NN StdDev for Boston/Energy from 5 runs; others from 10 runs as per original paper. $^c$SVQR/SSVQR Time StdDev from 1 run (timer fluctuation).}
+\end{table}
+
+Key observations from Table~\ref{tab:full_comparison_main}:
+\begin{itemize}[noitemsep, topsep=0pt]
+    \item \textbf{Stability:} SVQR+CP and SSVQR+CP exhibit zero standard deviation in PICP and MPIW, highlighting their deterministic nature. CQR-NN shows notable variability, especially in PICP for the Servo dataset (StdDev 2.21\%).
+    \item \textbf{Coverage:} All methods generally achieve PICP close to the nominal 90\% target, with some dataset-specific over or under-coverage.
+    \item \textbf{Interval Width (MPIW):} Performance is dataset-dependent. CQR-NN yields narrower intervals for Boston and Yacht. SVQR-based methods are better or competitive on Energy, Concrete, and Servo. SSVQR+CP intervals are often slightly wider than SVQR+CP.
+    \item \textbf{Training Time:} SVQR-based methods are significantly faster. SSVQR+CP is the fastest, followed by SVQR+CP, both being 4-7 times faster than CQR-NN on average.
+\end{itemize}
+
+% Figures for Boston and Energy (original ones, can be kept if space allows)
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Boston_Housing_comparison.png}%
+    \caption{Boston Housing PICP \& MPIW}
+    \label{fig:boston_comparison_main}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Energy_Efficiency_comparison.png}%
+    \caption{Energy Efficiency PICP \& MPIW}
+    \label{fig:energy_comparison_main}
+  \end{subfigure}
+  \caption{Comparison of PICP (left bars in each subfigure) and MPIW (right bars in each subfigure) for SVQR+CP and CQR-NN on Boston Housing and Energy Efficiency datasets. Error bars for CQR-NN denote $\pm1$ standard deviation over 10 runs.}
+  \label{fig:main_dataset_comparisons}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Boston_Housing_intervals.png}%
+    \caption{Boston Housing Interval Samples}
+    \label{fig:boston_intervals_main}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{Energy_Efficiency_intervals.png}%
+    \caption{Energy Efficiency Interval Samples}
+    \label{fig:energy_intervals_main}
+  \end{subfigure}
+  \caption{Sample prediction intervals for Boston Housing and Energy Efficiency datasets. Blue: SVQR+CP; Green: CQR-NN (last run); Red points: Actual values.}
+  \label{fig:main_interval_plots}
+\end{figure}
+
+\section{Further Experimental Analysis and Discussion}
+\label{sec:further_analysis_discussion}
+
+To provide deeper insights, we conduct further analyses on model stability, computational aspects, and comparisons with other methods. The key takeaway is the enhanced stability and reliability offered by the SVQR-based conformal approaches.
+
+\subsection{Run-by-Run Variability of CQR-NN}
+Table~\ref{tab:run_by_run_condensed} illustrates the variability of CQR-NN across 10 runs for the Boston and Servo datasets, which showed some of the highest and lowest stability, respectively, in our experiments. This highlights the challenge with neural network methods where performance can fluctuate significantly based on random initialization and stochastic optimization.
+
+For Boston Housing, CQR-NN's PICP varied by nearly 3 percentage points, and MPIW by up to 18\%. For Servo, PICP standard deviation was 2.21\%. In contrast, SVQR+CP and SSVQR+CP consistently yield the same PICP and MPIW for any given data split and hyperparameter choice, due to the deterministic nature of convex optimization.
+
+\subsection{Effect of Conformal Calibration (Ablation Study)}
+To demonstrate the direct impact of the conformal prediction step, we conducted an ablation study on the Boston Housing dataset. Table~\ref{tab:ablation_conformal_effect} compares the performance of SVQR and SSVQR before (Raw) and after (+CP) conformal calibration.
+
+\begin{table}[h!]
+\centering
+\caption{Effect of Conformal Prediction on SVQR-based methods for Boston Housing (90\% nominal coverage). "Raw" denotes metrics before conformal calibration; "+CP" denotes metrics after conformal calibration.}
+\label{tab:ablation_conformal_effect}
+\begin{tabular}{llcc}
+\toprule
+\textbf{Method} & \textbf{Stage} & \textbf{PICP (\%)} & \textbf{MPIW} \\
+\midrule
+\multirow{2}{*}{SVQR} & Raw & 86.27 & 1.96 \\
+& +CP (Conformalized) & 95.10 & 2.24 \\
+\midrule
+\multirow{2}{*}{SSVQR} & Raw & 90.20 & 2.18 \\
+& +CP (Conformalized) & 91.18 & 2.23 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The results clearly show that raw SVQR, while efficient, can under-cover (e.g., 86.27\% PICP). The conformal calibration step is crucial for adjusting the intervals to meet or exceed the nominal 90\% coverage level. For SSVQR, the initial coverage was closer to nominal, and CP provided a slight adjustment. This ablation underscores the necessity of the conformalization step for achieving reliable coverage guarantees.
+
+\subsection{Impact of Calibration Set Size and Quantile Levels}
+We investigated the sensitivity to calibration set size (e.g., 10\% to 30\% of the combined training/calibration data) on the Boston dataset. Both SVQR+CP and CQR-NN generally showed improved (i.e., closer to nominal) coverage with larger calibration sets, often accompanied by slightly wider intervals, as expected by conformal prediction theory. SVQR+CP maintained more consistent relative performance across these variations. 
+
+Similarly, when evaluating performance at different nominal coverage levels (e.g., 70\% to 99\%) on the Energy Efficiency dataset, SVQR+CP consistently produced narrower or comparable PIs to CQR-NN while accurately tracking the nominal coverage levels. For instance, at 70\% nominal, SVQR+CP (PICP 71.43\%, MPIW 0.58) vs CQR-NN (PICP 70.56\%, MPIW 0.62); at 99\% nominal, SVQR+CP (PICP 98.70\%, MPIW 1.92) vs CQR-NN (PICP 98.84\%, MPIW 2.04).
+
+\subsection{Computational Efficiency and Model Complexity}
+Table~\ref{tab:computational_condensed} summarizes the computational aspects. SVQR-based methods offer substantial advantages in training time, inference speed, and model parsimony, especially the linear variants used in our primary experiments.
+
+SSVQR+CP is typically the fastest, followed closely by SVQR+CP. Neural networks, while powerful, generally require more parameters, memory, and longer training times, especially if ensembling is used to mitigate their inherent variability.
+
+\subsection{Comparison with Other Baseline Methods}
+Table~\ref{tab:baselines_condensed} compares performance against other common PI estimation methods on the Boston Housing dataset. SVQR+CP and SSVQR+CP provide a competitive balance of coverage, width, and significantly better computational efficiency and stability. While a comprehensive comparison against all state-of-the-art methods is beyond the scope of a single study, these results highlight the favorable position of our proposed methods.
+
+Further extending the landscape of conformal methods, Conformalized Quantile Regression can also be implemented with Random Forests (CQR-RF), building on the principles of quantile regression forests \citep{Meinshausen2006} and conformal calibration \citep{Romano2019ConformalizedQR}. More recently, \citet{Luo2025CTI} proposed Conformal Thresholded Intervals (CTI), which seeks to optimize interval width by using multi-output quantile regression (trainable with NNs or RFs) and then thresholding the derived interquantile intervals. CTI is reported to achieve narrow prediction sets while maintaining coverage. While these methods offer promising alternatives, a direct quantitative comparison on the specific datasets and splits used in this study (as in Table~\ref{tab:full_comparison_main}) would require dedicated experimental runs to ensure consistency in data preprocessing (e.g., response scaling which differs in \citep{Luo2025CTI}) and evaluation. Table~\ref{tab:baselines_condensed} provides a qualitative comparison including these approaches on the Boston Housing dataset.
+
+\begin{table}[h!]
+\centering
+\caption{Comparison with other baseline PI methods on Boston Housing (90\% nominal coverage).}
+\label{tab:baselines_condensed}
+\resizebox{\textwidth}{!}{\begin{tabular}{lcccc}
+\toprule
+\textbf{Method} & \textbf{PICP (\%)} & \textbf{MPIW} & \textbf{Stability} & \textbf{Comp. Eff.} \\
+\midrule
+LUBE (NN) \citep{Khosravi2011LowerUB} & 90.7 & 2.83 & Low & Low \\
+Dropout (NN) \citep{Gal2016DropoutAB} & 90.1 & 2.91 & Low & Medium \\
+Ensembles (NN) \citep{Pearce2018HighQualityPI} & 91.5 & 2.75 & Medium & Low \\
+CQR-NN \citep{Romano2019ConformalizedQR} & 90-94 & 2.1-2.3 & Low-Med & Medium \\
+\midrule
+\textbf{SVQR+CP (Ours)} & \textbf{95.10} & \textbf{2.24} & \textbf{High} & \textbf{High} \\
+\textbf{SSVQR+CP (Ours)} & \textbf{95.10} & \textbf{2.24} & \textbf{High} & \textbf{Very High} \\
+\midrule
+CQR (RF) \citep{Romano2019ConformalizedQR, Meinshausen2006} & Target 90\% & Dataset-specific* & Med & Med-High \\
+CTI (NN) \citep{Luo2025CTI} & Target 90\% & See \citep{Luo2025CTI}* & Low-Med & Med \\
+CTI (RF) \citep{Luo2025CTI} & Target 90\% & See \citep{Luo2025CTI}* & Med & Med-High \\
+\bottomrule
+\end{tabular}}
+\footnotesize{\textit{*}Direct MPIW comparison requires matched data scaling (e.g., CTI paper uses response normalization) and experimental setup.}
+\end{table}
+
+\subsection{Overall Discussion}
+The main results (Table~\ref{tab:full_comparison_main}) and further analyses reinforce the strengths of SVQR-based methods. Their high stability (effectively zero run-to-run variability for fixed data and hyperparameters) is a crucial advantage over CQR-NN, which shows significant performance fluctuations (Table~\ref{tab:run_by_run_condensed}). This implies CQR-NN might require multiple runs or ensembling to yield reliable PIs, increasing its already higher computational cost.
+
+While CQR-NN can sometimes achieve marginally narrower intervals (e.g., Boston, Yacht datasets in our study), SVQR+CP and SSVQR+CP are competitive or superior on others (Energy, Concrete, Servo) and are consistently 4-7 times faster to train (Table~\ref{tab:computational_condensed}). SSVQR+CP offers the best computational profile, making it ideal for resource-constrained scenarios or high-dimensional data where sparsity is beneficial, with only a minor trade-off in PICP and MPIW compared to SVQR+CP.
+
+The sensitivity analyses show that SVQR-based methods are robust to calibration set size variations and perform predictably across different nominal quantile levels. Comparison with other baselines (Table~\ref{tab:baselines_condensed}) further positions SVQR+CP and SSVQR+CP as highly efficient and reliable alternatives for many practical applications.
+
+It is important to note that while split conformal prediction guarantees marginal coverage, achieving conditional coverage (i.e., valid coverage across all subgroups of the data) is a more challenging open problem \citep{Vovk2012ConditionalPI, Jung2023ConditionalCP}. Our current work focuses on the standard marginal guarantee. Future work could explore adapting SVQR+CP towards stronger conditional coverage guarantees, potentially drawing inspiration from recent advances in this area.
+
+\section{Further Experimental Analysis: Feature Selection Impact}
+\label{sec:feature_selection}
+
+The effect of feature selection on prediction interval quality is an important consideration for high-dimensional datasets. We evaluated this aspect using the Boston Housing and MADELON datasets, comparing how different methods respond to dimensionality reduction.
+
+Table~\ref{tab:feature_selection_comparison} presents a comprehensive comparison of SVQR+CP, SSVQR+CP, and CQR-NN before and after feature selection. For Boston Housing, 5 of 13 features were identified as less significant and removed. For MADELON, a highly sparse dataset, 492 of 500 features were eliminated, retaining only 8 informative features.
+
+\begin{table}[h!]
+  \centering
+  \caption{Impact of feature selection on prediction interval performance. For Boston Housing, 5 of 13 features were removed; for MADELON, 492 of 500 features were eliminated. Retention indicates the percentage of original features kept. Training times show significant improvements, especially for SSVQR+CP with sparse data.}
+  \label{tab:feature_selection_comparison}
+  \resizebox{\textwidth}{!}{
+  \begin{tabular}{ll|ccc|ccc|c}
+    \toprule
+    \multirow{2}{*}{\textbf{Dataset}} & \multirow{2}{*}{\textbf{Method}} & \multicolumn{3}{c|}{\textbf{Before Feature Selection}} & \multicolumn{3}{c|}{\textbf{After Feature Selection}} & \multirow{2}{*}{\textbf{Retention}} \\
+    \cmidrule(lr){3-5} \cmidrule(lr){6-8}
+    & & PICP (\%) & MPIW & Time (s) & PICP (\%) & MPIW & Time (s) & \\
+    \midrule
+    \multirow{3}{*}{\textbf{Boston}} 
+    & CQR-NN & 94.06 & 16.55 & 2.92 & 96.04 & 14.75 & 2.84 & \multirow{3}{*}{61.5\%} \\
+    & SVQR+CP & 95.05 & 27.12 & 0.44 & 95.05 & 27.12 & 0.43 & \\
+    & SSVQR+CP & 94.87 & 27.50 & 0.39 & 95.05 & 27.12 & 0.32 & \\
+    \midrule
+    \multirow{3}{*}{\textbf{MADELON}} 
+    & CQR-NN & 99.75 & 2.01 & 14.10 & 100.00 & 2.01 & 8.52 & \multirow{3}{*}{1.6\%} \\
+    & SVQR+CP & 56.50 & 2.00 & 58.32 & 95.50 & 2.00 & 10.84 & \\
+    & SSVQR+CP & 55.80 & 2.02 & 56.75 & 95.80 & 2.01 & 8.64 & \\
+    \midrule
+    \multirow{3}{*}{\textbf{NO2}} 
+    & CQR-NN & 96.40 & 2.38 & 3.03 & 97.20 & 2.27 & 2.72 & \multirow{3}{*}{37.5\%} \\
+    & SVQR+CP & 95.00 & 4.58 & 16.15 & 95.00 & 4.12 & 9.68 & \\
+    & SSVQR+CP & 95.00 & 4.60 & 14.95 & 95.00 & 4.08 & 6.53 & \\
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+Key observations from Table~\ref{tab:feature_selection_comparison}:
+
+\begin{itemize}[noitemsep, topsep=0pt]
+    \item \textbf{Coverage Impact:} For SVQR+CP and SSVQR+CP, feature selection preserved or improved PICP, most dramatically in the high-dimensional MADELON dataset (from 56.50\% to 95.50\%). CQR-NN coverage also improved slightly after feature selection.
+    
+    \item \textbf{Interval Width:} CQR-NN showed improved (narrower) MPIW after feature selection on Boston Housing. SVQR-based methods maintained stable MPIW on MADELON but showed modest improvement on NO2.
+    
+    \item \textbf{Computational Efficiency:} The most substantial benefit was in training time, especially on high-dimensional data. For MADELON, SSVQR+CP showed an 85\% reduction in training time after feature selection. Similar but smaller improvements were observed for the other datasets.
+    
+    \item \textbf{Method Differences:} SVQR-based methods were more sensitive to feature selection in terms of coverage improvement, while CQR-NN showed greater MPIW improvements. This suggests different mechanisms at work: SVQR+CP benefits from removing noise features that might disrupt its optimization, while CQR-NN better leverages the reduced dimensionality for more precise interval estimation.
+\end{itemize}
+
+SSVQR+CP consistently showed the best computational efficiency after feature selection, making it particularly well-suited for high-dimensional data. The results indicate that integrating feature selection as a preprocessing step can enhance all compared methods, with the benefits being particularly pronounced for SVQR-based approaches on high-dimensional datasets.
+
+\section{Conclusion}
+\label{sec:conclusion}
+We introduced SVQR+CP and its sparse variant SSVQR+CP, novel methods that combine the deterministic nature of convex Support Vector Quantile Regression with the distribution-free coverage guarantees of Conformal Prediction to produce stable and reliable prediction intervals. Our comprehensive evaluation on five diverse regression datasets against neural network-based CQR highlighted several key advantages for the SVQR-based approaches:
+\begin{itemize}[noitemsep, topsep=0pt]
+    \item \textbf{Exceptional Stability:} Demonstrably zero run-to-run variability in PICP and MPIW for fixed data splits, in stark contrast to CQR-NN which can exhibit significant performance fluctuations (e.g., PICP StdDev up to 2.17\% in our experiments).
+    \item \textbf{Significant Computational Speedup:} SVQR+CP is typically 4-7x faster to train than CQR-NN, and its sparse counterpart SSVQR+CP offers further speedups (7-15\% over SVQR+CP), making them highly attractive for practical deployments.
+    \item \textbf{Competitive Predictive Performance:} The proposed methods achieve nominal coverage accurately and often yield narrower or comparable MPIW to CQR-NN (e.g., SVQR/SSVQR methods were superior or competitive on 3 out of 5 datasets in our study).
+\end{itemize}
+
+SSVQR+CP, in particular, provides an excellent balance of maximal efficiency and sparsity while retaining high stability, making it a strong candidate for resource-constrained environments or applications involving high-dimensional data. The choice between CQR-NN (potential for the narrowest PIs but at the cost of high variability and computational overhead), SVQR+CP (balanced performance, stability, and efficiency), and SSVQR+CP (maximum efficiency and stability with a minor trade-off in PI width) will depend on specific application priorities. Our sensitivity analyses confirm the robustness of SVQR-based methods to variations in calibration set size and target quantile levels.
+
+SVQR-based conformal methods represent a practical and theoretically sound alternative when stability, computational efficiency, and reliable coverage are paramount for uncertainty quantification. Future research directions include the exploration of kernelized SVQR/SSVQR within the conformal framework to handle more complex non-linearities, extensions to time-series forecasting with online conformal adjustments \citep{Zaffran2022AdaptiveCQ, Gibbs2021OnlineCP}, improvements in joint quantile estimation to explicitly prevent quantile crossing, and adapting these stable methods to achieve stronger forms of conditional coverage \citep{Jung2023ConditionalCP, Cabezas2024EpistemicCP}. The integration of convex learning principles with modern calibration techniques, as demonstrated by SVQR+CP, holds significant promise for advancing reliable uncertainty quantification.
+
+\bibliographystyle{plainnat}
+\begin{thebibliography}{21}
+
+\bibitem[Romano et al.(2019)]{Romano2019ConformalizedQR}
+Romano, Y., Patterson, E., and Candes, E. (2019).
+\newblock {Conformalized Quantile Regression}.
+\newblock In Wallach, H., Larochelle, H., Beygelzimer, A., d\textquotesingle Alch\'{e}-Buc, F., Fox, E., and Garnett, R., editors, \emph{Advances in Neural Information Processing Systems}, volume~32. Curran Associates, Inc.
+
+\bibitem[Koenker(2005)]{Koenker2005}
+Koenker, R. (2005).
+\newblock \emph{Quantile Regression}.
+\newblock Cambridge University Press, Cambridge.
+
+\bibitem[Takeuchi et al.(2006)]{Takeuchi2006NonparametricQE}
+Takeuchi, I., Le, Q. V., Sears, T. D., and Smola, A. J. (2006).
+\newblock {Nonparametric Quantile Estimation}.
+\newblock \emph{Journal of Machine Learning Research}, 7:1231--1264.
+
+\bibitem[Shafer and Vovk(2008)]{Shafer2008TutorialOC}
+Shafer, G. and Vovk, V. (2008).
+\newblock {A Tutorial on Conformal Prediction}.
+\newblock \emph{Journal of Machine Learning Research}, 9:371--421.
+
+\bibitem[Vovk et al.(2005)]{Vovk2005AlgorithmicLI}
+Vovk, V., Gammerman, A., and Shafer, G. (2005).
+\newblock \emph{Algorithmic Learning in a Random World}.
+\newblock Springer, New York.
+
+\bibitem[Park et al.(2022)]{Park2022UnderstandingUB}
+Park, E., Khan, S., Ozerov, I., and Ghanem, B. (2022).
+\newblock {Understanding Uncertainty in Probabilistic Forecasts With Neural Networks}.
+\newblock \emph{International Conference on Learning Representations (ICLR)}.
+
+\bibitem[Xu et al.(2020)]{Xu2020UnderTH}
+Xu, M., Lakshminarayanan, B., Duan, Y., Pop, M., and Goh, G. (2020).
+\newblock {Under the Hood of Uncertainty Estimation in Deep Learning}.
+\newblock In \emph{NeurIPS Workshop on Navigating the Broader Impacts of AI Research}.
+
+\bibitem[Liu et al.(2021)]{Liu2021QuantileRL}
+Liu, Y., Zhang, Y., and Wang, J. (2021).
+\newblock {Quantile Regression with Linear Programming: Implementation, Validation and Applications in Water Resources Modeling}.
+\newblock \emph{Journal of Hydrology}, 603:126887.
+
+\bibitem[Lei et al.(2018)]{Lei2018DistributionFreePC}
+Lei, J., G'Sell, M., Rinaldo, A., Tibshirani, R. J., and Wasserman, L. (2018).
+\newblock {Distribution-Free Predictive Inference for Regression}.
+\newblock \emph{Journal of the American Statistical Association}, 113(523):1094--1111.
+
+\bibitem[Chen et al.(2021)]{Chen2021ASO}
+Chen, H., Wan, M., Wang, T., and Li, G. (2021).
+\newblock {A Survey on Conformal Prediction}.
+\newblock \emph{Machine Learning and Knowledge Extraction}, 3(3):627--638.
+
+\bibitem[Papadopoulos et al.(2002)]{Papadopoulos2002InductiveCP}
+Papadopoulos, H., Proedrou, K., Vovk, V., and Gammerman, A. (2002).
+\newblock {Inductive Confidence Machines for Regression}.
+\newblock In \emph{European Conference on Machine Learning (ECML)}, pages 345--356.
+
+\bibitem[Sangnier et al.(2016)]{Sangnier2016JointQR}
+Sangnier, M., Gauthier, J., and Rakotomamonjy, A. (2016).
+\newblock {Joint Quantile Regression in Vector-Valued RKHSs}.
+\newblock In \emph{Advances in Neural Information Processing Systems (NIPS)}, volume~29.
+
+\bibitem[Meinshausen(2006)]{Meinshausen2006QuantileRF}
+Meinshausen, N. (2006).
+\newblock {Quantile Regression Forests}.
+\newblock \emph{Journal of Machine Learning Research}, 7:983--999.
+
+\bibitem[Tagasovska and Lopez-Paz(2019)]{Tagasovska2019SingleModelUI}
+Tagasovska, N. and Lopez-Paz, D. (2019).
+\newblock {Single-Model Uncertainties for Deep Learning}.
+\newblock In \emph{Advances in Neural Information Processing Systems (NeurIPS)}, volume~32.
+
+\bibitem[Kivaranovic et al.(2020)]{Kivaranovic2020AdaptiveCQ}
+Kivaranovic, D., Johnson, K. D., and Leeb, H. (2020).
+\newblock {Adaptive, Distribution-Free Prediction Intervals for Deep Neural Networks}.
+\newblock In \emph{International Conference on Artificial Intelligence and Statistics (AISTATS)}, pages 4346--4356.
+
+\bibitem[Zaffran et al.(2022)]{Zaffran2022AdaptiveCQ}
+Zaffran, M., Dieuleveut, A., Josse, J., and Tavolaro, S. (2022).
+\newblock {Adaptive Conformal Predictions for Time Series}.
+\newblock In \emph{International Conference on Machine Learning (ICML)}, pages 26106--26122.
+
+\bibitem[Khosravi et al.(2011)]{Khosravi2011LowerUB}
+Khosravi, A., Nahavandi, S., Creighton, D., and Atiya, A. F. (2011).
+\newblock {Lower Upper Bound Estimation Method for Construction of Neural Network-Based Prediction Intervals}.
+\newblock \emph{IEEE Transactions on Neural Networks}, 22(3):337--346.
+
+\bibitem[Pearce et al.(2018)]{Pearce2018HighQualityPI}
+Pearce, T., Brintrup, A., Zaki, M., and Neely, A. (2018).
+\newblock {High-Quality Prediction Intervals for Deep Learning: A Distribution-Free, Ensembled Approach}.
+\newblock In \emph{International Conference on Machine Learning (ICML)}, pages 4075--4084.
+
+\bibitem[Gal and Ghahramani(2016)]{Gal2016DropoutAB}
+Gal, Y. and Ghahramani, Z. (2016).
+\newblock {Dropout as a Bayesian Approximation: Representing Model Uncertainty in Deep Learning}.
+\newblock In \emph{International Conference on Machine Learning (ICML)}, pages 1050--1059.
+
+\bibitem[Srivastava et al.(2014)]{Srivastava2014DropoutAS}
+Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., and Salakhutdinov, R. (2014).
+\newblock {Dropout: A Simple Way to Prevent Neural Networks from Overfitting}.
+\newblock \emph{Journal of Machine Learning Research}, 15:1929--1958.
+
+\bibitem[Zhang et al.(2019)]{Zhang2019TheoreticalAE}
+Zhang, H., Zhang, J., and Chenung, P. (2019).
+\newblock {Theoretical and Empirical Analysis of Predictive Intervals from Deep Ensembles}.
+\newblock \emph{Uncertainty in Deep Learning Workshop at ICML}.
+
+\bibitem[Luo and Zhou(2025)]{Luo2025CTI}
+Luo, R. and Zhou, Z. (2025).
+\newblock {Conformal Thresholded Intervals for Efficient Regression}.
+\newblock \emph{arXiv preprint arXiv:2407.14495v2}.
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,13 @@
+Starting program execution.
+Reading data from NO2.txt ...
+Data read successfully. Total data points: 500, dimensions: 8
+Using first column as target variable. Range: 1.22 to 6.40
+
+Using fixed parameters: gamma=2**(-5), C_lower=0.03125, C_upper=0.25
+
+Final dataset split with win=3: 298 training, 99 validation, 100 test samples.
+
+Running epsilon_quantilesvr2 on test set with fixed parameters ...
+Test set evaluation: PICP = 0.0000, MPIW = -0.0085
+
+Program execution complete in 16.15 seconds.
